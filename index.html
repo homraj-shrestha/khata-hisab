@@ -135,7 +135,7 @@ img{max-width:100%;height:auto}
 <button class="main-nav" onclick="page(&#39;home&#39;)"><span class="nav-icon">🏠</span> मुख्य पृष्ठ</button>
 <button class="main-nav" onclick="page(&#39;items&#39;)"><span class="nav-icon">📦</span> सामान / Stock</button>
 <button class="main-nav" onclick="page(&#39;purchase&#39;)"><span class="nav-icon">🛒</span> खरिद / Purchase</button>
-<button class="main-nav" onclick="page(&#39;sales&#39;)"><span class="nav-icon">🧾</span> बिक्री / Sales</button><button class="main-nav" onclick="page(&#39;expense&#39;)"><span class="nav-icon">💸</span> खर्च / Expense</button><button onclick="page(&#39;payments&#39;)">💰 Payment / Receive</button><button onclick="page(&#39;reports&#39;)">📊 Reports</button><button onclick="page(&#39;contacts&#39;)">👥 Customer/Supplier</button><button onclick="page(&#39;backup&#39;)">💾 Backup / Restore</button>
+<button class="main-nav" onclick="page(&#39;sales&#39;)"><span class="nav-icon">🧾</span> बिक्री / Sales</button><button class="main-nav" onclick="page(&#39;expense&#39;)"><span class="nav-icon">💸</span> खर्च / Expense</button><button class="main-nav" onclick="page(&#39;returns&#39;)"><span class="nav-icon">↩️</span> फिर्ता / Return</button><button onclick="page(&#39;payments&#39;)">💰 Payment / Receive</button><button onclick="page(&#39;reports&#39;)">📊 Reports</button><button onclick="page(&#39;contacts&#39;)">👥 Customer/Supplier</button><button onclick="page(&#39;backup&#39;)">💾 Backup / Restore</button>
 </nav>
 
 <main>
@@ -241,6 +241,35 @@ img{max-width:100%;height:auto}
 
 
 
+<section id="returns" class="page">
+<div class="card">
+  <h2>↩️ फिर्ता / Return</h2>
+  <p>बिक्री फिर्ता आएमा स्टक बढ्छ। खरिद फिर्ता गर्दा स्टक घट्छ। यसको असर स्टक र हिसाबमा स्वतः देखिन्छ।</p>
+  <div class="grid">
+    <div><label>फिर्ताको प्रकार</label>
+      <select id="rType" onchange="renderReturnParties()">
+        <option value="S">बिक्री फिर्ता (ग्राहकबाट)</option>
+        <option value="P">खरिद फिर्ता (Supplier लाई)</option>
+      </select></div>
+    <div><label>मिति (वि.सं.)</label><input id="rDate" placeholder="२०८३-०४-३०"></div>
+    <div><label>पार्टी</label><select id="rParty"></select></div>
+    <div id="rFromBillWrap" style="display:none"><label>बिलबाट सामान छान्नुहोस् <small id="rBillNo"></small></label><select id="rFromBill" onchange="fillReturnFromBill()"></select></div>
+    <div><label>सामान</label><select id="rItem" onchange="renderReturnUnits()"></select></div>
+    <div><label>इकाई</label><select id="rUnit"></select></div>
+    <div><label>मात्रा</label><input id="rQty" type="text" inputmode="decimal"></div>
+    <div><label>दर (रु.) — वैकल्पिक</label><input id="rRate" type="text" inputmode="decimal"></div>
+    <div><label>कारण / टिप्पणी</label><input id="rNote" placeholder="उदाहरण: क्षति भएको"></div>
+  </div>
+  <div style="margin-top:10px"><button onclick="saveReturn()">✅ फिर्ता Save गर्नुहोस्</button></div>
+</div>
+<div class="card">
+  <h2>फिर्ता सूची</h2>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>नं.</th><th>मिति</th><th>प्रकार</th><th>पार्टी</th><th>सामान</th><th>मात्रा</th><th>स्टकमा असर</th><th>कार्य</th></tr></thead>
+    <tbody id="returnsBody"></tbody>
+  </table></div>
+</div>
+</section>
 <section id="expense" class="page">
 <div class="card">
   <h2>💸 खर्च / Expense</h2>
@@ -549,7 +578,7 @@ function normalizeDB(x){
   x.contacts=Array.isArray(x.contacts)?x.contacts:[];
   x.payments=Array.isArray(x.payments)?x.payments:[];
   x.expenses=Array.isArray(x.expenses)?x.expenses:[];
-  x.deletedItems=Array.isArray(x.deletedItems)?x.deletedItems.map(v=>String(v)):[];x.adjusts=Array.isArray(x.adjusts)?x.adjusts:[];x.tomb=(x.tomb&&typeof x.tomb==='object')?x.tomb:{};['sales','purchases','payments','expenses','contacts'].forEach(k=>{x.tomb[k]=(x.tomb[k]&&typeof x.tomb[k]==='object')?x.tomb[k]:{};});
+  x.deletedItems=Array.isArray(x.deletedItems)?x.deletedItems.map(v=>String(v)):[];x.adjusts=Array.isArray(x.adjusts)?x.adjusts:[];x.returns=Array.isArray(x.returns)?x.returns:[];x.nextR=Number(x.nextR)||1;x.tomb=(x.tomb&&typeof x.tomb==='object')?x.tomb:{};['sales','purchases','payments','expenses','contacts','returns'].forEach(k=>{x.tomb[k]=(x.tomb[k]&&typeof x.tomb[k]==='object')?x.tomb[k]:{};});
   x.nextP=Number(x.nextP)||1; x.nextS=Number(x.nextS)||1;
   return x;
 }
@@ -599,7 +628,7 @@ function migrateContactLinks(){
   db.payments.forEach(x=>{const c=findContact(x.contactId,norm(x.type)==='payment'?'supplier':'customer')||findContact(x.contact,'supplier')||findContact(x.contact,'customer');if(c){x.contactId=c.id;x.contact=c.name;}x.amount=Number(x.amount)||0;});
 }
 migrateContactLinks();
-try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
+try{finalizeStock();localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
 const $=id=>document.getElementById(id);
 function backupPayload(){const out=normalizeDB(JSON.parse(JSON.stringify(db)));out.deletedItems=Array.from(new Set([...(out.deletedItems||[]),...PROTECTED_DELETED_IDS].map(String)));return {app:"Jishan Traders",version:"1.24",exportedAt:new Date().toISOString(),db:out}}
 function downloadBackup(){const payload=backupPayload();const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const a=document.createElement("a");const d=new Date();const stamp=d.toISOString().replace(/[:.]/g,"-");a.href=URL.createObjectURL(blob);a.download=`Jishan_Traders_Backup_${stamp}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);showBackupStatus("Backup file तयार भयो। यसलाई सुरक्षित ठाउँमा राख्नुहोस्।")}
@@ -900,12 +929,12 @@ async function cloudRequest(action,payload){const c=getCloudCfg();if(!c.url||!c.
 async function cloudPull(){try{setCloudStatus("Cloud बाट data ल्याउँदै...");const r=await cloudRequest("pull");if(r.db){mergeCloudDB(r.db);saveDB(false);setCloudStatus("Cloud data local data सँग merge भयो।");alert("Cloud बाट data सफलतापूर्वक ल्याइयो।")}else setCloudStatus("Cloud मा अझै data छैन।")}catch(e){setCloudStatus("समस्या: "+e.message);alert("Cloud Pull असफल: "+e.message)}}
 async function cloudPush(){try{setCloudStatus("Cloud मा data पठाउँदै...");const r=await cloudRequest("push",backupPayload());setCloudStatus(r.message||"Cloud मा सुरक्षित भयो।");}catch(e){setCloudStatus("समस्या: "+e.message);alert("Cloud Push असफल: "+e.message)}}
 async function cloudSync(){try{setCloudStatus("Sync हुँदैछ...");const r=await cloudRequest("sync",backupPayload());if(r.db){mergeCloudDB(r.db);saveDB(false);await cloudPush();}else await cloudPush();setCloudStatus("Sync पूरा भयो।");}catch(e){setCloudStatus("समस्या: "+e.message);alert("Cloud Sync असफल: "+e.message)}}
-function saveDB(triggerCloud=false){localStorage.setItem(KEY,JSON.stringify(db));try{localStorage.setItem(KEY+"_LAST_SNAPSHOT",JSON.stringify(backupPayload()));}catch(e){}render();if(typeof scheduleAutoSync==='function')scheduleAutoSync();if(triggerCloud){const c=getCloudCfg();if(c.url&&c.key&&navigator.onLine){clearTimeout(window.__cloudTimer);window.__cloudTimer=setTimeout(()=>cloudPush().catch(()=>{}),1200);}}}
+function saveDB(triggerCloud=false){finalizeStock();localStorage.setItem(KEY,JSON.stringify(db));try{localStorage.setItem(KEY+"_LAST_SNAPSHOT",JSON.stringify(backupPayload()));}catch(e){}render();if(typeof scheduleAutoSync==='function')scheduleAutoSync();if(triggerCloud){const c=getCloudCfg();if(c.url&&c.key&&navigator.onLine){clearTimeout(window.__cloudTimer);window.__cloudTimer=setTimeout(()=>cloudPush().catch(()=>{}),1200);}}}
 // Cloud is intentionally NOT auto-synced in V4 while the master data is being verified.
 window.addEventListener("online",()=>{});
 
 loadCloudConfig();
-function page(id){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));$(id).classList.add("active");if(id==="purchase"){refreshPurchaseRows();renderPurchaseHistory()}if(id==="sales"&&!$("sRows").children.length)addSalesRow();if(id==="payments")renderPayments();if(id==="expense")renderExpenses();if(id==="reports")renderReports();if(id==="contacts")renderContacts();render();}
+function page(id){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));$(id).classList.add("active");if(id==="purchase"){refreshPurchaseRows();renderPurchaseHistory()}if(id==="sales"&&!$("sRows").children.length)addSalesRow();if(id==="payments")renderPayments();if(id==="expense")renderExpenses();if(id==="returns")renderReturnsPage();if(id==="reports")renderReports();if(id==="contacts")renderContacts();render();}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 
 const PRODUCT_PHOTO_KEY="JISHAN_TRADERS_PRODUCT_PHOTOS_V1";
@@ -1000,7 +1029,7 @@ function setBSToday(id){ const el=$(id); if(el && !String(el.value||'').trim()){
 function setAllNewEntryDates(){ setBSToday('pDate'); setBSToday('sDate'); setBSToday('payDate'); setBSToday('eDate'); }
 
 function purchaseDraft(){let rows=[...$("pRows").children].map(r=>{const id=+r.querySelector(".pi").value,qty=+r.querySelector(".pq").value||0,rate=+r.querySelector(".pr").value||0,it=db.items.find(x=>x.id===id),unitType=r.querySelector(".punit")?.value||"primary";return{id,qty,rate,unitType,baseQty:qty*rowUnitFactor(it,unitType)}}).filter(x=>x.id&&x.qty>0);let t=purchaseTotals(),pay=calcPurchasePayment();return{no:$("pNo").value,date:$("pDate").value,supplier:$("pSupplier").value,vatRate:+$("pVat").value||0,discount:t.d,subtotal:t.sub,vat:t.v,total:t.total,paidAmount:pay.paid,paymentStatus:pay.status,balance:pay.balance,terms:$("pTerms").value,rows};}
-function savePurchase(){let d=purchaseDraft();d.supplierId=+$("pSupplier").value||0;if(!d.supplierId){alert("Supplier छान्नुहोस्। Supplier Balance सही हिसाबका लागि Supplier अनिवार्य छ।");return}if(!d.rows.length){alert("कम्तीमा एउटा सामान छान्नुहोस्।");return}d.rows.forEach(z=>{let it=db.items.find(x=>x.id===z.id);if(it){it.qty=(+it.qty||0)+z.baseQty;it.buy=z.rate/(rowUnitFactor(it,z.unitType)||1)}});d.uid=_takeUid('P',d.no);d.ts=Date.now();db.purchases.push(d);db.nextP++;saveDB();renderPurchaseHistory();alert("Purchase Bill Save भयो। Paid/Partial/Balance बिलमै राखियो र Stock Primary Unit मा बढ्यो।");newPurchase();}
+function savePurchase(){let d=purchaseDraft();d.supplierId=+$("pSupplier").value||0;if(!d.supplierId){alert("Supplier छान्नुहोस्। Supplier Balance सही हिसाबका लागि Supplier अनिवार्य छ।");return}if(!d.rows.length){alert("कम्तीमा एउटा सामान छान्नुहोस्।");return}d.rows.forEach(z=>{let it=db.items.find(x=>x.id===z.id);if(it){it.buy=z.rate/(rowUnitFactor(it,z.unitType)||1)}});var _oldP=__edit.P?__edit.P.uid:null;d.uid=_takeUid('P',d.no);if(_oldP)db.purchases=db.purchases.filter(function(b){return billUid(b)!==_oldP;});d.ts=Date.now();db.purchases.push(d);db.nextP++;saveDB();renderPurchaseHistory();alert("Purchase Bill Save भयो। Paid/Partial/Balance बिलमै राखियो र Stock Primary Unit मा बढ्यो।");newPurchase();}
 function newPurchase(){ __purchaseCashAuto=false;$("pNo").value="PUR-"+String(Number(db.nextP)||1);$("pDate").value=bs2083Today();$("pSupplier").value="";$("pDisc").value=0;$("pVat").value=13;if($("pPaid"))$("pPaid").value=0;__purchaseCashAuto=false;if($("pFullPaid"))$("pFullPaid").checked=false;if($("pCashNote"))$("pCashNote").textContent="";if($("pTerms"))$("pTerms").value=DEFAULT_BILL_TERMS;$("pRows").innerHTML="";addPurchaseRow();calcPurchase();}
 function clearBillHistorySearch(id,renderFn){
  const el=$(id);if(el)el.value="";
@@ -1020,7 +1049,7 @@ function renderPurchaseHistory(){
    const paidForThisSupplier=db.payments.filter(p=>Number(p.contactId)===sid&&p.type==="payment").reduce((a,p)=>a+(Number(p.amount)||0),0);
    const supplierPurchaseTotal=db.purchases.filter(p=>Number(p.supplierId)===sid).reduce((a,p)=>a+(Number(p.total)||0),0);
    const remaining=Number.isFinite(Number(x.balance))?Math.max(0,Number(x.balance)||0):Math.max(0,supplierPurchaseTotal-paidForThisSupplier-(db.contacts.find(c=>Number(c.id)===sid)?.opening||0));
-   return `<tr><td>${esc(x.no)}</td><td>${esc(x.date)}</td><td>${esc(x.supplierId?contactName(x.supplierId):x.supplier)}</td><td>रु. ${(Number(x.total)||0).toFixed(2)}</td><td><b>${esc(x.paymentStatus||((Number(x.paidAmount||0)>=Number(x.total||0)&&Number(x.total||0)>0)?"FULL PAID":Number(x.paidAmount||0)>0?"PARTIAL PAID":"BALANCE"))}</b><br>Paid: रु. ${(Number(x.paidAmount)||0).toFixed(2)}<br>Balance: रु. ${remaining.toFixed(2)}</td><td><button onclick="previewPurchase(${i})">Preview</button><button onclick="editPurchase(${i})">✏️ Edit</button><button class="red" onclick="deletePurchase(${i})">🗑️ Delete</button></td></tr>`;
+   return `<tr><td>${esc(x.no)}</td><td>${esc(x.date)}</td><td>${esc(x.supplierId?contactName(x.supplierId):x.supplier)}</td><td>रु. ${(Number(x.total)||0).toFixed(2)}</td><td><b>${esc(x.paymentStatus||((Number(x.paidAmount||0)>=Number(x.total||0)&&Number(x.total||0)>0)?"FULL PAID":Number(x.paidAmount||0)>0?"PARTIAL PAID":"BALANCE"))}</b><br>Paid: रु. ${(Number(x.paidAmount)||0).toFixed(2)}<br>Balance: रु. ${remaining.toFixed(2)}</td><td><button onclick="previewPurchase(${i})">Preview</button><button onclick="editPurchase(${i})">✏️ Edit</button><button onclick="returnFromPurchase(${i})">↩️ फिर्ता</button><button class="red" onclick="deletePurchase(${i})">🗑️ Delete</button></td></tr>`;
  }).join("") || '<tr><td colspan="6" style="text-align:center">खोजी अनुसार Purchase Bill भेटिएन।</td></tr>';
 }
 
@@ -1089,7 +1118,7 @@ function calcSales(){
   return t;
 }
 function calcSalesPayment(){let total=salesTotals().total;let paid=Math.max(0,+$("sPaid")?.value||0);if($("sFullPaid")&&$("sFullPaid").checked){paid=total;if($("sPaid"))$("sPaid").value=total.toFixed(2);}if(paid>total){paid=total;if($("sPaid"))$("sPaid").value=total.toFixed(2);}let balance=Math.max(0,total-paid);let status=paid>=total&&total>0?"FULL PAID":paid>0?"PARTIAL PAID":"BALANCE";if($("sBalance"))$("sBalance").textContent=balance.toFixed(2);if($("sPayStatus")){let el=$("sPayStatus");el.innerHTML=livePaymentStamp(status);el.className=status==="FULL PAID"?"full-paid":status==="PARTIAL PAID"?"partial-paid":"balance-due";}return{paid,balance,status};}
-function saveSale(){let rows=[...$("sRows").children].map(r=>{const id=+r.querySelector(".si").value,qty=+r.querySelector(".sq").value||0,rate=+r.querySelector(".sr").value||0,it=db.items.find(x=>x.id===id),unitType=r.querySelector(".sunit")?.value||"primary";return{id,qty,rate,unitType,baseQty:qty*rowUnitFactor(it,unitType)}}).filter(x=>x.id&&x.qty>0);if(!rows.length){alert("कम्तीमा एउटा सामान छान्नुहोस्।");return}let t=salesTotals(),pay=calcSalesPayment();rows.forEach(z=>{let it=db.items.find(x=>x.id===z.id);if(it)it.qty=(+it.qty||0)-z.baseQty});db.sales.push({uid:_takeUid('S',$("sNo").value),ts:Date.now(),no:$("sNo").value,date:$("sDate").value,customerId:+$("sCustomer").value||0,customer:contactName($("sCustomer").value),vatRate:+$("sVat").value||0,subtotal:t.sub,discount:t.d,vat:t.v,total:t.total,paidAmount:pay.paid,paymentStatus:pay.status,balance:pay.balance,terms:$("sTerms").value,rows});db.nextS++;saveDB();renderSalesHistory();alert("Sales Bill Save भयो। Paid/Partial/Balance बिलमै राखियो। Stock Primary Unit बाट घटाइयो।");$("sNo").value="INV-"+String(Number(db.nextS)||1);$("sDate").value=bs2083Today();$("sPaid").value="0";if($("sFullPaid"))$("sFullPaid").checked=false;__cashAuto=false;if($("sTerms"))$("sTerms").value=DEFAULT_BILL_TERMS;calcSales();if(typeof sCustomerChanged==="function")sCustomerChanged();}
+function saveSale(){let rows=[...$("sRows").children].map(r=>{const id=+r.querySelector(".si").value,qty=+r.querySelector(".sq").value||0,rate=+r.querySelector(".sr").value||0,it=db.items.find(x=>x.id===id),unitType=r.querySelector(".sunit")?.value||"primary";return{id,qty,rate,unitType,baseQty:qty*rowUnitFactor(it,unitType)}}).filter(x=>x.id&&x.qty>0);if(!rows.length){alert("कम्तीमा एउटा सामान छान्नुहोस्।");return}let t=salesTotals(),pay=calcSalesPayment();var _oldS=__edit.S?__edit.S.uid:null;var _sUid=_takeUid('S',$("sNo").value);if(_oldS)db.sales=db.sales.filter(function(b){return billUid(b)!==_oldS;});db.sales.push({uid:_sUid,ts:Date.now(),no:$("sNo").value,date:$("sDate").value,customerId:+$("sCustomer").value||0,customer:contactName($("sCustomer").value),vatRate:+$("sVat").value||0,subtotal:t.sub,discount:t.d,vat:t.v,total:t.total,paidAmount:pay.paid,paymentStatus:pay.status,balance:pay.balance,terms:$("sTerms").value,rows});db.nextS++;saveDB();renderSalesHistory();alert("Sales Bill Save भयो। Paid/Partial/Balance बिलमै राखियो। Stock Primary Unit बाट घटाइयो।");$("sNo").value="INV-"+String(Number(db.nextS)||1);$("sDate").value=bs2083Today();$("sPaid").value="0";if($("sFullPaid"))$("sFullPaid").checked=false;__cashAuto=false;if($("sTerms"))$("sTerms").value=DEFAULT_BILL_TERMS;calcSales();if(typeof sCustomerChanged==="function")sCustomerChanged();}
 function showPreview(content){const paper=document.getElementById("paper"),box=document.getElementById("preview");if(!paper||!box){alert("Preview area भेटिएन।");return}paper.innerHTML=content||"";box.style.display="block";}
 function closePreview(){const box=document.getElementById("preview");if(box)box.style.display="none";}
 async function sharePreview(){
@@ -1241,13 +1270,13 @@ function deleteItem(id){
 function deletePurchase(i){
  let x=db.purchases[i];if(!x)return;
  if(!confirm("Purchase "+x.no+" Delete गर्ने हो? यसले त्यस Purchase बाट आएको Stock पनि घटाउनेछ।"))return;
- x.rows.forEach(z=>{let it=db.items.find(a=>a.id===z.id);if(it)it.qty=(+it.qty||0)-rowBaseQty(z,it);});
+ 
  _tomb('purchases',billUid(x));db.purchases.splice(i,1);saveDB();renderPurchaseHistory();alert("Purchase Delete भयो र Stock मिलाइयो।");
 }
 function editPurchase(i){try{var _b=db.purchases[i];if(_b)__edit.P={uid:billUid(_b),no:String(_b.no),t:Date.now()};}catch(e){}
  let x=db.purchases[i];if(!x)return;
  // Remove the old stock effect, load bill into the form, and let Save create the corrected record.
- x.rows.forEach(z=>{let it=db.items.find(a=>a.id===z.id);if(it)it.qty=(+it.qty||0)-rowBaseQty(z,it);});
+ 
  $("pNo").value=x.no;$("pDate").value=x.date;$("pSupplier").value=x.supplierId||"";$("pVat").value=(x.vatRate!==undefined&&x.vatRate!==null)?x.vatRate:13;$("pDisc").value=x.discount||0;
  $("pRows").innerHTML="";
  x.rows.forEach(z=>{addPurchaseRow();let r=$("pRows").lastElementChild,s=r.querySelector(".pi");s.value=z.id;purchaseChanged(s);if(r.querySelector(".punit"))r.querySelector(".punit").value=z.unitType||"primary";r.querySelector(".pq").value=z.qty;r.querySelector(".pr").value=z.rate;});
@@ -1256,12 +1285,12 @@ function editPurchase(i){try{var _b=db.purchases[i];if(_b)__edit.P={uid:billUid(
 function deleteSale(i){
  let x=db.sales[i];if(!x)return;
  if(!confirm("Invoice "+x.no+" Delete गर्ने हो? यसले बिक्री भएको Stock फेरि थप्नेछ।"))return;
- x.rows.forEach(z=>{let it=db.items.find(a=>a.id===z.id);if(it)it.qty=(+it.qty||0)+rowBaseQty(z,it);});
+ 
  _tomb('sales',billUid(x));db.sales.splice(i,1);saveDB();alert("Sales Delete भयो र Stock मिलाइयो।");
 }
 function editSale(i){try{var _b=db.sales[i];if(_b)__edit.S={uid:billUid(_b),no:String(_b.no),t:Date.now()};}catch(e){}
  let x=db.sales[i];if(!x)return;
- x.rows.forEach(z=>{let it=db.items.find(a=>a.id===z.id);if(it)it.qty=(+it.qty||0)+rowBaseQty(z,it);});
+ 
  $("sNo").value=x.no;$("sDate").value=x.date;$("sCustomer").value=x.customerId||"";$("sVat").value=(x.vatRate!==undefined&&x.vatRate!==null)?x.vatRate:13;$("sDisc").value=x.discount||0;if($("sPaid"))$("sPaid").value=Number(x.paidAmount||0);if($("sFullPaid"))$("sFullPaid").checked=false;__cashAuto=false;
  $("sRows").innerHTML="";
  x.rows.forEach(z=>{addSalesRow();let r=$("sRows").lastElementChild,s=r.querySelector(".si");s.value=z.id;salesChanged(s);if(r.querySelector(".sunit"))r.querySelector(".sunit").value=z.unitType||"primary";r.querySelector(".sq").value=z.qty;r.querySelector(".sr").value=z.rate;});
@@ -1278,7 +1307,7 @@ function renderSalesHistory(){
  });
  $("sHistory").innerHTML=rows.map(({x,i})=>{
    let paid=Number(x.paidAmount||0),bal=Math.max(0,Number(x.balance??(Number(x.total||0)-paid))),st=x.paymentStatus||(paid>=Number(x.total||0)&&Number(x.total||0)>0?"FULL PAID":paid>0?"PARTIAL PAID":"BALANCE");
-   return `<tr><td>${esc(x.no)}</td><td>${esc(x.date)}</td><td>${esc(x.customer)}</td><td>रु. ${Number(x.total||0).toFixed(2)}</td><td>${st}<br>Paid: रु. ${paid.toFixed(2)}<br>Balance: रु. ${bal.toFixed(2)}</td><td><button onclick="showPreview(salesHTML(db.sales[${i}]))">Preview</button><button onclick="editSale(${i})">✏️ Edit</button><button class="red" onclick="deleteSale(${i})">🗑️ Delete</button></td></tr>`;
+   return `<tr><td>${esc(x.no)}</td><td>${esc(x.date)}</td><td>${esc(x.customer)}</td><td>रु. ${Number(x.total||0).toFixed(2)}</td><td>${st}<br>Paid: रु. ${paid.toFixed(2)}<br>Balance: रु. ${bal.toFixed(2)}</td><td><button onclick="showPreview(salesHTML(db.sales[${i}]))">Preview</button><button onclick="editSale(${i})">✏️ Edit</button><button onclick="returnFromSale(${i})">↩️ फिर्ता</button><button class="red" onclick="deleteSale(${i})">🗑️ Delete</button></td></tr>`;
  }).join("") || '<tr><td colspan="6" style="text-align:center">खोजी अनुसार Sales Bill भेटिएन।</td></tr>';
 }
 
@@ -1930,7 +1959,7 @@ function clearExpenseSearch(){
    - Every bill has a permanent id (uid), so edits/deletes travel between devices.
    - Stock is adjusted by the bills that arrive, never overwritten by the other device's number.
 */
-var TOMB_COLLS=['sales','purchases','payments','expenses','contacts'];
+var TOMB_COLLS=['sales','purchases','payments','expenses','contacts','returns'];
 var __edit={S:null,P:null};
 var __busy=false,__again=false,__timer=null,__failN=0,__applying=false,__ver=0,__lastOk=0,__lastTry=0;
 var SYNC_DIRTY_KEY=KEY+'_DIRTY';
@@ -1961,7 +1990,140 @@ function _uidCmp(a,b){
 }
 
 /* stock effect of one bill: kind 'P' adds stock, 'S' reduces it. sign +1 = apply, -1 = undo */
-function _applyBill(kind,b,sign,skip){
+/* ===== Stock = सुरु स्टक + सबै खरिद − सबै बिक्री + समायोजन (बिलबाटै गणना) ===== */
+
+/* ===== सामान फिर्ता (बिक्री फिर्ता / खरिद फिर्ता) ===== */
+var __retSrc=null, __retOpen=false;
+function returnFromSale(i){
+  const b=db.sales[i]; if(!b) return;
+  __retSrc={kind:"S",no:b.no,rows:b.rows||[],partyId:String(b.customerId||"")};
+  __retOpen=true; page("returns");
+  $("rType").value="S"; renderReturnParties();
+  $("rParty").value=__retSrc.partyId; setReturnSrc();
+}
+function returnFromPurchase(i){
+  const b=db.purchases[i]; if(!b) return;
+  __retSrc={kind:"P",no:b.no,rows:b.rows||[],partyId:String(b.supplierId||"")};
+  __retOpen=true; page("returns");
+  $("rType").value="P"; renderReturnParties();
+  $("rParty").value=__retSrc.partyId; setReturnSrc();
+}
+function setReturnSrc(){
+  const box=$("rFromBillWrap");
+  if(!__retSrc){ if(box) box.style.display="none"; return; }
+  box.style.display="block";
+  $("rBillNo").textContent="(बिल: "+__retSrc.no+")";
+  $("rFromBill").innerHTML=__retSrc.rows.map(function(r,k){
+    const it=db.items.find(function(x){return String(x.id)===String(r.id);});
+    return '<option value="'+k+'">'+esc(it?it.name:("#"+r.id))+" — "+esc(r.qty)+" "+(r.unitType==="secondary"?"(Secondary)":"(Primary)")+"</option>";
+  }).join("");
+  fillReturnFromBill();
+}
+function fillReturnFromBill(){
+  if(!__retSrc) return;
+  const r=__retSrc.rows[+$("rFromBill").value||0]; if(!r) return;
+  $("rItem").value=String(r.id);
+  renderReturnUnits();
+  $("rUnit").value=r.unitType==="secondary"?"secondary":"primary";
+  $("rQty").value=r.qty;
+  $("rRate").value=r.rate||"";
+}
+function renderReturnsPage(){
+  if(!__retOpen) __retSrc=null;
+  __retOpen=false;
+  renderReturnParties(); renderReturnItems(); renderReturnsList();
+  if($("rDate")&&!$("rDate").value) $("rDate").value=bs2083Today();
+}
+function renderReturnParties(){
+  const kind=$("rType").value;
+  const want=kind==="S"?"customer":"supplier";
+  const list=db.contacts.filter(x=>String(x.type||"").toLowerCase()===want);
+  $("rParty").innerHTML='<option value="">-- छान्नुहोस् --</option>'+list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("");
+}
+function renderReturnItems(){
+  $("rItem").innerHTML='<option value="">-- सामान छान्नुहोस् --</option>'+db.items.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("");
+  renderReturnUnits();
+}
+function renderReturnUnits(){
+  const it=db.items.find(x=>String(x.id)===String($("rItem").value));
+  const m=it?unitMeta(it):null;
+  let h=`<option value="primary">${esc(m?m.base:"Primary")}</option>`;
+  if(m&&m.hasSecondary) h+=`<option value="secondary">${esc(m.secondary)} (1 = ${m.factor} ${esc(m.base)})</option>`;
+  $("rUnit").innerHTML=h;
+}
+function saveReturn(){
+  const kind=$("rType").value;
+  const itemId=String($("rItem").value||"");
+  const it=db.items.find(x=>String(x.id)===itemId);
+  if(!it){alert("सामान छान्नुहोस्।");return;}
+  const qty=Number(String($("rQty").value).replace(/,/g,""))||0;
+  if(qty<=0){alert("मात्रा लेख्नुहोस्।");return;}
+  const partyId=String($("rParty").value||"");
+  if(!partyId){alert(kind==="S"?"Customer छान्नुहोस्।":"Supplier छान्नुहोस्।");return;}
+  const unitType=$("rUnit").value||"primary";
+  const baseQty=_r6(qty*rowUnitFactor(it,unitType));
+  const rec={
+    uid:_newUid(), ts:Date.now(), srcNo:__retSrc?__retSrc.no:"",
+    no:(kind==="S"?"SR-":"PR-")+String(db.nextR||1),
+    date:$("rDate").value||"", kind,
+    partyId, party:contactName(partyId),
+    itemId, itemName:it.name,
+    qty, unitType, baseQty,
+    rate:Number($("rRate").value)||0,
+    note:$("rNote").value||""
+  };
+  db.returns=db.returns||[];
+  db.returns.push(rec); db.nextR=(Number(db.nextR)||1)+1;
+  __retSrc=null; setReturnSrc();
+  saveDB();
+  $("rQty").value=""; $("rRate").value=""; $("rNote").value="";
+  renderReturnsList();
+  alert((kind==="S"?"बिक्री फिर्ता":"खरिद फिर्ता")+" Save भयो। स्टक "+(kind==="S"?"बढ्यो":"घट्यो")+"।");
+}
+function renderReturnsList(){
+  const body=$("returnsBody"); if(!body) return;
+  const list=(db.returns||[]).map((r,i)=>({r,i})).reverse();
+  body.innerHTML=list.map(({r,i})=>{
+    const it=db.items.find(x=>String(x.id)===String(r.itemId));
+    const unitLbl=r.unitType==="secondary"&&it&&unitMeta(it).hasSecondary?unitMeta(it).secondary:(it?unitMeta(it).base:"");
+    const eff=r.kind==="S"?"+":"−";
+    return `<tr><td>${esc(r.no)}${r.srcNo?"<br><small>बिल: "+esc(r.srcNo)+"</small>":""}</td><td>${esc(r.date)}</td><td>${r.kind==="S"?"बिक्री फिर्ता":"खरिद फिर्ता"}</td><td>${esc(r.party)}</td><td>${esc(r.itemName)}</td><td>${esc(r.qty)} ${esc(unitLbl)}</td><td>${eff}${esc(r.baseQty)} ${esc(it?unitMeta(it).base:"")}</td><td><button onclick="deleteReturn(${i})">🗑</button></td></tr>`;
+  }).join("")||`<tr><td colspan="8">कुनै फिर्ता छैन</td></tr>`;
+}
+function deleteReturn(i){
+  const r=(db.returns||[])[i]; if(!r) return;
+  if(!confirm(r.no+" मेटाउने हो? स्टक पहिलेजस्तै हुनेछ।")) return;
+  _tomb('returns', billUid(r));
+  db.returns.splice(i,1);
+  saveDB(); renderReturnsList();
+  alert("फिर्ता मेटियो, स्टक मिलाइयो।");
+}
+
+function _netMap(){
+  var byId={}; db.items.forEach(function(it){ byId[String(it.id)]=it; });
+  var m={};
+  function add(id,v){ m[id]=(m[id]||0)+v; }
+  db.purchases.forEach(function(b){ (b.rows||[]).forEach(function(r){ var it=byId[String(r.id)]; if(it) add(String(r.id), rowBaseQty(r,it)); }); });
+  db.sales.forEach(function(b){ (b.rows||[]).forEach(function(r){ var it=byId[String(r.id)]; if(it) add(String(r.id), -rowBaseQty(r,it)); }); });
+  (db.returns||[]).forEach(function(r){ var it=byId[String(r.itemId)]; if(!it) return; var v=rowBaseQty({baseQty:r.baseQty,qty:r.qty,unitType:r.unitType},it); add(String(r.itemId), r.kind==='S'?+v:-v); });
+  (db.adjusts||[]).forEach(function(a){ add(String(a.itemId), +a.delta||0); });
+  return m;
+}
+function ensureOpening(){
+  var m=_netMap();
+  db.items.forEach(function(it){
+    if(it.opening===undefined||it.opening===null) it.opening=_r6((+it.qty||0)-(m[String(it.id)]||0));
+  });
+}
+function recomputeStock(){
+  var m=_netMap();
+  db.items.forEach(function(it){ it.qty=_r6((+it.opening||0)+(m[String(it.id)]||0)); });
+}
+function finalizeStock(){ ensureOpening(); recomputeStock(); }
+
+/* पुरानो incremental स्टक अपडेट बन्द: स्टक माथिको सूत्रबाट मात्र आउँछ */
+function _applyBill(kind,b,sign,skip){ return; }
+function _applyBill_OLD(kind,b,sign,skip){
   var dir=(kind==='P'?1:-1)*sign;
   (Array.isArray(b.rows)?b.rows:[]).forEach(function(r){
     var it=db.items.find(function(a){return String(a.id)===String(r.id);});
@@ -2045,6 +2207,7 @@ function mergeCloudDB(incoming){
   // ---- bills (stock follows the bills) ----
   _mergeBills('sales','S',incoming,newItems);
   _mergeBills('purchases','P',incoming,newItems);
+  _mergeBills('returns','R',incoming,newItems);
 
   // ---- manual stock corrections ----
   var haveAdj=new Set((db.adjusts||[]).map(function(a){return String(a.uid);}));
