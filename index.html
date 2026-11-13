@@ -242,7 +242,7 @@ img{max-width:100%;height:auto}
 
 
 <section id="returns" class="page">
-<div class="card">
+<div class="card" id="retManualCard">
   <h2>↩️ फिर्ता / Return</h2>
   <p>बिक्री फिर्ता आएमा स्टक बढ्छ। खरिद फिर्ता गर्दा स्टक घट्छ। यसको असर स्टक र हिसाबमा स्वतः देखिन्छ।</p>
   <div class="grid">
@@ -261,6 +261,15 @@ img{max-width:100%;height:auto}
     <div><label>कारण / टिप्पणी</label><input id="rNote" placeholder="उदाहरण: क्षति भएको"></div>
   </div>
   <div style="margin-top:10px"><button onclick="saveReturn()">✅ फिर्ता Save गर्नुहोस्</button></div>
+</div>
+<div class="card" id="retBillCard" style="display:none">
+  <h2>↩️ बिलको सामान फिर्ता</h2>
+  <p>प्रत्येक सामानको फिर्ता मात्रा लेख्नुहोस्। खाली वा ० भएका सामान फिर्ता हुँदैनन्। बिलभन्दा बढी फिर्ता हुँदैन।</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>सामान</th><th>बिलको मात्रा</th><th>पहिले फिर्ता भएको</th><th>अब फिर्ता मात्रा</th><th>दर (रु.)</th></tr></thead>
+    <tbody id="retBillBody"></tbody>
+  </table></div>
+  <div style="margin-top:10px"><button onclick="saveBillReturn()">✅ बिल फिर्ता Save गर्नुहोस्</button> <button class="gray" onclick="cancelBillReturn()">रद्द गर्नुहोस्</button></div>
 </div>
 <div class="card">
   <h2>फिर्ता सूची</h2>
@@ -1437,6 +1446,7 @@ function contactBalance(id){
      const supplierName = x.supplierId ? contactName(x.supplierId) : (x.supplierName ?? x.supplier ?? '');
      if(sameContact(x.supplierId,supplierName) || sameContact(x.contactId,x.contactName) || norm(x.supplier)===targetName || norm(x.supplierName)===targetName){
        bills += Number(x.total??x.grandTotal??x.amount??0)||0;
+       if(Object.prototype.hasOwnProperty.call(x,"paidAmount")) received+=Math.max(0,Number(x.paidAmount)||0);
      }
    });
    db.payments.forEach(x=>{if(norm(x.type)==='payment' && sameContact(x.contactId,x.contact)) received+=Number(x.amount)||0;});
@@ -2008,16 +2018,68 @@ function returnFromPurchase(i){
   $("rType").value="P"; renderReturnParties();
   $("rParty").value=__retSrc.partyId; setReturnSrc();
 }
+function billRetRemain(src,row){
+  const it=db.items.find(function(x){return String(x.id)===String(row.id);});
+  const billed=_r6(row.baseQty!=null?Number(row.baseQty):rowBaseQty(row,it||{}));
+  const done=_r6((db.returns||[]).filter(function(r){return r.srcNo===src.no&&r.kind===src.kind&&String(r.itemId)===String(row.id);}).reduce(function(a,r){return a+(+r.baseQty||0);},0));
+  return {billed:billed,done:done,remain:_r6(billed-done)};
+}
 function setReturnSrc(){
-  const box=$("rFromBillWrap");
-  if(!__retSrc){ if(box) box.style.display="none"; return; }
-  box.style.display="block";
-  $("rBillNo").textContent="(बिल: "+__retSrc.no+")";
-  $("rFromBill").innerHTML=__retSrc.rows.map(function(r,k){
+  const bill=$("retBillCard"), man=$("retManualCard");
+  if(!__retSrc){ if(bill) bill.style.display="none"; if(man) man.style.display=""; return; }
+  if(man) man.style.display="none";
+  bill.style.display="";
+  $("retBillBody").innerHTML=__retSrc.rows.map(function(r,k){
     const it=db.items.find(function(x){return String(x.id)===String(r.id);});
-    return '<option value="'+k+'">'+esc(it?it.name:("#"+r.id))+" — "+esc(r.qty)+" "+(r.unitType==="secondary"?"(Secondary)":"(Primary)")+"</option>";
+    const u=it?unitMeta(it):{base:"",secondary:"",hasSecondary:false,factor:1};
+    const rm=billRetRemain(__retSrc,r);
+    const lbl=r.unitType==="secondary"?(u.secondary||"Secondary"):(u.base||"Primary");
+    return '<tr><td>'+esc(it?it.name:("#"+r.id))+'</td>'+
+      '<td>'+esc(r.qty)+' '+esc(lbl)+'</td>'+
+      '<td>'+esc(rm.done)+' '+esc(u.base)+'</td>'+
+      '<td><input id="rq_'+k+'" type="text" inputmode="decimal" placeholder="0" style="width:90px"> <small>('+esc(rm.remain)+' '+esc(u.base)+' बाँकी)</small></td>'+
+      '<td><input id="rr_'+k+'" type="text" inputmode="decimal" value="'+esc(r.rate||"")+'" style="width:90px"></td></tr>';
   }).join("");
-  fillReturnFromBill();
+}
+function cancelBillReturn(){ __retSrc=null; setReturnSrc(); }
+function saveBillReturn(){
+  if(!__retSrc) return;
+  const partyId=String($("rParty").value||"");
+  if(!partyId){ alert(__retSrc.kind==="S"?"Customer छान्नुहोस्।":"Supplier छान्नुहोस्।"); return; }
+  const picked=[];
+  for(let k=0;k<__retSrc.rows.length;k++){
+    const qty=Number(String($("rq_"+k).value||"").replace(/,/g,""))||0;
+    if(qty<=0) continue;
+    const r=__retSrc.rows[k];
+    const it=db.items.find(function(x){return String(x.id)===String(r.id);});
+    if(!it) continue;
+    const unitType=r.unitType||"primary";
+    const base=_r6(qty*rowUnitFactor(it,unitType));
+    const rem=billRetRemain(__retSrc,r).remain;
+    if(base>rem+1e-9){
+      alert(it.name+": बाँकी फिर्ता योग्य मात्रा "+rem+" मात्र छ। त्यसभन्दा बढी फिर्ता गर्न मिल्दैन।");
+      return;
+    }
+    picked.push({r:r,it:it,qty:qty,unitType:unitType,base:base,rate:Number($("rr_"+k).value)||0});
+  }
+  if(!picked.length){ alert("कम्तीमा एक सामानको फिर्ता मात्रा लेख्नुहोस्।"); return; }
+  db.returns=db.returns||[];
+  picked.forEach(function(x){
+    db.returns.push({
+      uid:_newUid(), ts:Date.now(),
+      no:(__retSrc.kind==="S"?"SR-":"PR-")+String(db.nextR||1),
+      date:$("rDate").value||"", kind:__retSrc.kind,
+      partyId:partyId, party:contactName(partyId),
+      itemId:String(x.r.id), itemName:x.it.name,
+      qty:x.qty, unitType:x.unitType, baseQty:x.base, rate:x.rate,
+      note:$("rNote").value||"", srcNo:__retSrc.no
+    });
+    db.nextR=(Number(db.nextR)||1)+1;
+  });
+  const cnt=picked.length;
+  __retSrc=null; setReturnSrc();
+  saveDB(); renderReturnsList();
+  alert(cnt+" सामानको फिर्ता Save भयो। स्टक मिलाइयो।");
 }
 function fillReturnFromBill(){
   if(!__retSrc) return;
@@ -2031,7 +2093,7 @@ function fillReturnFromBill(){
 function renderReturnsPage(){
   if(!__retOpen) __retSrc=null;
   __retOpen=false;
-  renderReturnParties(); renderReturnItems(); renderReturnsList();
+  renderReturnParties(); renderReturnItems(); renderReturnsList(); setReturnSrc();
   if($("rDate")&&!$("rDate").value) $("rDate").value=bs2083Today();
 }
 function renderReturnParties(){
