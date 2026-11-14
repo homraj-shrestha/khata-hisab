@@ -571,7 +571,7 @@ img{max-width:100%;height:auto}
 </div><div style="margin-top:12px"><button onclick="saveQuickItem()">💾 Save &amp; Select</button><button class="gray" onclick="closeQuickItem()">Cancel</button></div>
 </div></div>
 <div id="preview">
-<div class="preview-actions"><button id="printBtn" onclick="printPreview('print')">🖨️ Print</button><button id="savePdfBtn" onclick="printPreview('pdf')">📄 Save PDF</button><button id="browserPreviewBtn" onclick="openPrintPreview()">👁️ Print Preview</button><button id="sharePreviewBtn" onclick="sharePreview()">📤 Bill Send</button><button class="gray" onclick="closePreview()">बन्द</button></div>
+<div class="preview-actions"><button id="printBtn" onclick="printPreview('print')">🖨️ Print</button><button id="savePdfBtn" onclick="printPreview('pdf')">📄 Save PDF</button><button id="browserPreviewBtn" onclick="openPrintPreview()">👁️ Print Preview</button><button id="sharePreviewBtn" onclick="sharePreview()">📤 Bill Send</button><button id="fmtBtn" onclick="togglePrintFormat()" style="display:none">🧾 Thermal</button><button class="gray" onclick="closePreview()">बन्द</button></div>
 <div id="paper" class="preview-paper"></div>
 </div>
 
@@ -1128,7 +1128,27 @@ function calcSales(){
 }
 function calcSalesPayment(){let total=salesTotals().total;let paid=Math.max(0,+$("sPaid")?.value||0);if($("sFullPaid")&&$("sFullPaid").checked){paid=total;if($("sPaid"))$("sPaid").value=total.toFixed(2);}if(paid>total){paid=total;if($("sPaid"))$("sPaid").value=total.toFixed(2);}let balance=Math.max(0,total-paid);let status=paid>=total&&total>0?"FULL PAID":paid>0?"PARTIAL PAID":"BALANCE";if($("sBalance"))$("sBalance").textContent=balance.toFixed(2);if($("sPayStatus")){let el=$("sPayStatus");el.innerHTML=livePaymentStamp(status);el.className=status==="FULL PAID"?"full-paid":status==="PARTIAL PAID"?"partial-paid":"balance-due";}return{paid,balance,status};}
 function saveSale(){let rows=[...$("sRows").children].map(r=>{const id=+r.querySelector(".si").value,qty=+r.querySelector(".sq").value||0,rate=+r.querySelector(".sr").value||0,it=db.items.find(x=>x.id===id),unitType=r.querySelector(".sunit")?.value||"primary";return{id,qty,rate,unitType,baseQty:qty*rowUnitFactor(it,unitType)}}).filter(x=>x.id&&x.qty>0);if(!rows.length){alert("कम्तीमा एउटा सामान छान्नुहोस्।");return}let t=salesTotals(),pay=calcSalesPayment();var _oldS=__edit.S?__edit.S.uid:null;var _sUid=_takeUid('S',$("sNo").value);if(_oldS)db.sales=db.sales.filter(function(b){return billUid(b)!==_oldS;});db.sales.push({uid:_sUid,ts:Date.now(),no:$("sNo").value,date:$("sDate").value,customerId:+$("sCustomer").value||0,customer:contactName($("sCustomer").value),vatRate:+$("sVat").value||0,subtotal:t.sub,discount:t.d,vat:t.v,total:t.total,paidAmount:pay.paid,paymentStatus:pay.status,balance:pay.balance,terms:$("sTerms").value,rows});db.nextS++;saveDB();renderSalesHistory();alert("Sales Bill Save भयो। Paid/Partial/Balance बिलमै राखियो। Stock Primary Unit बाट घटाइयो।");$("sNo").value="INV-"+String(Number(db.nextS)||1);$("sDate").value=bs2083Today();$("sPaid").value="0";if($("sFullPaid"))$("sFullPaid").checked=false;__cashAuto=false;if($("sTerms"))$("sTerms").value=DEFAULT_BILL_TERMS;calcSales();if(typeof sCustomerChanged==="function")sCustomerChanged();}
-function showPreview(content){const paper=document.getElementById("paper"),box=document.getElementById("preview");if(!paper||!box){alert("Preview area भेटिएन।");return}paper.innerHTML=content||"";box.style.display="block";}
+var PRINT_FMT=(function(){try{return localStorage.getItem("JISHAN_PRINT_FMT")||"a4";}catch(e){return "a4";}})();
+function isBillHTML(c){c=String(c||"");return c.indexOf("Invoice No.")>=0||c.indexOf("Purchase No.")>=0;}
+function applyPrintFormat(){
+  const paper=document.getElementById("paper"), btn=document.getElementById("fmtBtn");
+  if(!paper) return;
+  const bill=paper.dataset.bill==="1";
+  paper.classList.toggle("thermal", bill && PRINT_FMT==="thermal");
+  if(btn){ btn.style.display=bill?"":"none"; btn.textContent=(PRINT_FMT==="thermal")?"📄 A4 मा फर्काउनुहोस्":"🧾 Thermal (80mm)"; }
+}
+function togglePrintFormat(){
+  PRINT_FMT=(PRINT_FMT==="thermal")?"a4":"thermal";
+  try{localStorage.setItem("JISHAN_PRINT_FMT",PRINT_FMT);}catch(e){}
+  applyPrintFormat();
+}
+function thermalFix(css,paper){
+  return (paper&&paper.classList.contains("thermal"))?String(css).split("@page{size:A4;margin:10mm}").join("@page{size:80mm auto;margin:2mm}"):css;
+}
+function THERMAL_CSS(paper){
+  return paper&&paper.classList.contains("thermal")?"@page{size:80mm auto;margin:2mm}.preview-paper{width:76mm!important;max-width:76mm!important;margin:0 auto!important;padding:0!important;font-size:11px!important}.preview-paper table{font-size:10px!important}.preview-paper h1{font-size:15px!important}.preview-paper h2{font-size:13px!important}":"";
+}
+function showPreview(content){const paper=document.getElementById("paper"),box=document.getElementById("preview");if(!paper||!box){alert("Preview area भेटिएन।");return}paper.innerHTML=content||"";paper.dataset.bill=isBillHTML(content)?"1":"0";applyPrintFormat();box.style.display="block";}
 function closePreview(){const box=document.getElementById("preview");if(box)box.style.display="none";}
 async function sharePreview(){
   const paper=document.getElementById("paper");
@@ -1148,9 +1168,9 @@ function printPreview(mode="print"){
   if(!w){alert("Print window खोल्न सकिएन। Chrome मा popup अनुमति दिनुहोस्।");return;}
   const styles=[...document.querySelectorAll("style")].map(x=>x.textContent).join("\n");
   /* The app's original print CSS hides every direct child of body. Override that rule in this print-only window. */
-  const printFix='body{background:#fff!important;margin:0!important;padding:10mm!important;color:#222!important}body>*{display:block!important;visibility:visible!important}.preview-paper{display:block!important;visibility:visible!important;max-width:none!important;min-height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#222!important}.preview-actions{display:none!important}.bill-payment-box,.payment-stamp,.payment-details{visibility:visible!important;display:flex!important}.payment-details{display:block!important}.bill-payment-box{break-inside:avoid;page-break-inside:avoid}.payment-stamp svg{display:block!important;visibility:visible!important}.preview-paper table{display:table!important;visibility:visible!important}thead{display:table-header-group!important}tr,td,th{visibility:visible!important}@media print{body{padding:0!important}body>*{display:block!important;visibility:visible!important}@page{size:A4;margin:10mm}.billTerms,.terms-conditions{display:block!important;visibility:visible!important}}';
+  const printFix=THERMAL_CSS(paper)+'body{background:#fff!important;margin:0!important;padding:10mm!important;color:#222!important}body>*{display:block!important;visibility:visible!important}.preview-paper{display:block!important;visibility:visible!important;max-width:none!important;min-height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#222!important}.preview-actions{display:none!important}.bill-payment-box,.payment-stamp,.payment-details{visibility:visible!important;display:flex!important}.payment-details{display:block!important}.bill-payment-box{break-inside:avoid;page-break-inside:avoid}.payment-stamp svg{display:block!important;visibility:visible!important}.preview-paper table{display:table!important;visibility:visible!important}thead{display:table-header-group!important}tr,td,th{visibility:visible!important}@media print{body{padding:0!important}body>*{display:block!important;visibility:visible!important}@page{size:A4;margin:10mm}.billTerms,.terms-conditions{display:block!important;visibility:visible!important}}';
   w.document.open();
-  w.document.write('<!doctype html><html lang="ne"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jishan Traders - '+(mode==="pdf"?"Save PDF":"Print")+'</title><style>'+styles+'\n'+printFix+'</style></head><body><div class="preview-paper">'+paper.innerHTML+'</div></body></html>');
+  w.document.write('<!doctype html><html lang="ne"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jishan Traders - '+(mode==="pdf"?"Save PDF":"Print")+'</title><style>'+styles+'\n'+thermalFix(printFix,paper)+'</style></head><body><div class="preview-paper">'+paper.innerHTML+'</div></body></html>');
   w.document.close();
   const doPrint=function(){setTimeout(function(){try{w.focus();if(mode!=="preview")w.print();}catch(e){alert("Print खोल्न सकिएन। नयाँ प्रिन्ट विन्डोबाट Ctrl+P थिच्नुहोस्।");}},700);};
   w.onload=doPrint;
@@ -1162,8 +1182,8 @@ function openPrintPreview(){
   const w=window.open("about:blank","_blank","width=900,height=700");
   if(!w){alert("Preview window खोल्न सकिएन। Chrome मा popup अनुमति दिनुहोस्।");return;}
   const styles=[...document.querySelectorAll("style")].map(x=>x.textContent).join("\n");
-  const printFix="body{background:#fff!important;margin:0!important;padding:10mm!important;color:#222!important}body>*{display:block!important;visibility:visible!important}.preview-paper{display:block!important;visibility:visible!important;max-width:none!important;min-height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#222!important}.preview-actions{display:none!important}.bill-payment-box,.payment-stamp,.payment-details{visibility:visible!important;display:flex!important}.payment-details{display:block!important}.bill-payment-box{break-inside:avoid;page-break-inside:avoid}.payment-stamp svg{display:block!important;visibility:visible!important}.preview-paper table{display:table!important;visibility:visible!important}thead{display:table-header-group!important}tr,td,th{visibility:visible!important}@media print{body{padding:0!important}@page{size:A4;margin:10mm}.billTerms,.terms-conditions{display:block!important;visibility:visible!important}}";
-  w.document.open();w.document.write("<!doctype html><html lang=\"ne\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Jishan Traders - Print Preview</title><style>"+styles+"\n"+printFix+"</style></head><body><div class=\"preview-paper\">"+paper.innerHTML+"</div></body></html>");w.document.close();
+  const printFix=THERMAL_CSS(paper)+"body{background:#fff!important;margin:0!important;padding:10mm!important;color:#222!important}body>*{display:block!important;visibility:visible!important}.preview-paper{display:block!important;visibility:visible!important;max-width:none!important;min-height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#222!important}.preview-actions{display:none!important}.bill-payment-box,.payment-stamp,.payment-details{visibility:visible!important;display:flex!important}.payment-details{display:block!important}.bill-payment-box{break-inside:avoid;page-break-inside:avoid}.payment-stamp svg{display:block!important;visibility:visible!important}.preview-paper table{display:table!important;visibility:visible!important}thead{display:table-header-group!important}tr,td,th{visibility:visible!important}@media print{body{padding:0!important}@page{size:A4;margin:10mm}.billTerms,.terms-conditions{display:block!important;visibility:visible!important}}";
+  w.document.open();w.document.write("<!doctype html><html lang=\"ne\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Jishan Traders - Print Preview</title><style>"+styles+"\n"+thermalFix(printFix,paper)+"</style></head><body><div class=\"preview-paper\">"+paper.innerHTML+"</div></body></html>");w.document.close();
 }
 const DEFAULT_BILL_TERMS = "१. बिल प्राप्त गर्दा सामान तथा रकम जाँच गर्नुहोस्।\n२. कुनै त्रुटि भए तुरुन्त जानकारी गराउनुहोस्।\n३. बाँकी रकम सहमत समयभित्र भुक्तानी गर्नुहोस्।\n४. धन्यवाद, फेरि सेवा गर्ने अवसर दिनुहोला।";
 const BILL_LOGO_KEY = "JISHAN_TRADERS_BILL_LOGO_V1";
