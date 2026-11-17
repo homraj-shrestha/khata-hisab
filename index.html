@@ -60,7 +60,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid
 body{background:var(--page-bg);padding-left:235px}
 header{min-height:108px;display:flex;flex-direction:column;justify-content:center;padding:16px 24px}
 nav{position:fixed;left:0;top:0;bottom:0;width:235px;z-index:2000;background:linear-gradient(180deg,#17365d 0%,#102c4d 100%);padding:18px 12px;border:0;box-shadow:4px 0 18px rgba(0,0,0,.12);overflow-y:auto}
-nav::before{content:"जिशन ट्रेडर्स";display:block;color:#fff;font-size:23px;font-weight:700;padding:8px 10px 20px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.18)}
+nav::before{content:var(--shop,"जिशन ट्रेडर्स");display:block;color:#fff;font-size:23px;font-weight:700;padding:8px 10px 20px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.18)}
 nav button.main-nav,nav button{display:flex;align-items:center;width:100%;min-height:46px;margin:6px 0;padding:10px 12px;border-radius:8px;background:transparent;color:#fff;text-align:left;font-size:14px;transition:background .15s ease,transform .15s ease}
 nav button:hover{background:var(--sidebar-hover);transform:translateX(2px)}
 nav button:active{transform:translateX(1px)}
@@ -130,7 +130,7 @@ img{max-width:100%;height:auto}
 <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
-<header><h1>जिशन ट्रेडर्स</h1><div style="font-size:12px;opacity:.85">Accounting V1.41 • Auto Sync</div><div>उर्लाबारी–७, बरगाछी, मोरङ | फोन: ९८४२०७५८३८ | PAN: ६१२९९३७३०</div></header>
+<header><h1 id="shopTitle">जिशन ट्रेडर्स</h1><div style="font-size:12px;opacity:.85">Accounting V1.41 • Auto Sync</div><div>उर्लाबारी–७, बरगाछी, मोरङ | फोन: ९८४२०७५८३८ | PAN: ६१२९९३७३०</div></header>
 <nav class="sidebar-nav">
 <button class="main-nav" onclick="page(&#39;home&#39;)"><span class="nav-icon">🏠</span> मुख्य पृष्ठ</button>
 <button class="main-nav" onclick="page(&#39;items&#39;)"><span class="nav-icon">📦</span> सामान / Stock</button>
@@ -144,7 +144,7 @@ img{max-width:100%;height:auto}
 <div><b>सामान</b><div id="nItems">19</div></div><div><b>Stock Qty</b><div id="nQty">19</div></div>
 <div><b>Purchase Bills</b><div id="nPurchases">2</div></div><div><b>Sales Bills</b><div id="nSales">13</div></div><div><b>Expense</b><div id="nExpenses">0</div></div>
 </div></div>
-<div class="card" id="homeBalance"><h2>💼 बाँकी रकम</h2><div class="grid"><div><b>पाउनु पर्ने (Receivable)</b><div class="big" id="hRecv">रु. 0.00</div></div><div><b>दिनु पर्ने (Payable)</b><div class="big" id="hPay">रु. 0.00</div></div></div></div>
+<div class="card" id="homeBalance"><h2>💼 बाँकी रकम</h2><div class="grid"><div onclick="showBalanceList('customer')" style="cursor:pointer"><b>पाउनु पर्ने (Receivable)</b> <small>👆 ककस्को?</small><div class="big" id="hRecv">रु. 0.00</div></div><div onclick="showBalanceList('supplier')" style="cursor:pointer"><b>दिनु पर्ने (Payable)</b> <small>👆 ककस्को?</small><div class="big" id="hPay">रु. 0.00</div></div></div></div>
 <div class="card" id="homeQuick"><h2>⚡ जल्दी काम</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
 <button onclick="openQuickItem()">＋ नयाँ सामान</button>
 <button onclick="openQuickContact('customer')">＋ नयाँ Customer</button>
@@ -447,6 +447,7 @@ img{max-width:100%;height:auto}
 </div>
 </section>
 <section id="backup" class="page">
+<div class="card"><h2>🏷️ व्यवसायको नाम</h2><p>यो नाम माथिको शीर्षक, बिल र छपाइमा देखिन्छ।</p><input id="shopNameIn" placeholder="व्यवसायको नाम" style="width:70%"> <button onclick="saveShopName()">💾 सेभ</button></div>
 <div class="card"><h2>💾 Backup / Restore</h2>
 <p><b>Offline-first:</b> तपाईंको data यही browser मा पनि सुरक्षित रहन्छ। तर computer/browser/Gmail profile परिवर्तन गर्दा data नहराओस् भनेर नियमित Backup राख्नुहोस्।</p>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
@@ -576,6 +577,52 @@ img{max-width:100%;height:auto}
 </div>
 
 <script>
+/* ================= व्यवसायको नाम ================= */
+const SHOP_KEY = "JISHAN_SHOP_NAME_V1";
+function shopName(){ return localStorage.getItem(SHOP_KEY) || "जिशन ट्रेडर्स"; }
+function applyShopName(){
+  const n = shopName();
+  document.documentElement.style.setProperty("--shop", JSON.stringify(n));
+  const t = document.getElementById("shopTitle"); if (t) t.textContent = n;
+  document.title = n + " - Accounting";
+  const inp = document.getElementById("shopNameIn"); if (inp && !inp.value) inp.value = n;
+}
+function saveShopName(){
+  const v = (document.getElementById("shopNameIn").value || "").trim();
+  if (!v) return alert("नाम लेख्नुहोस्।");
+  localStorage.setItem(SHOP_KEY, v); applyShopName(); alert("नाम सेभ भयो।");
+}
+
+/* ================= पाउनु / दिनुपर्ने रकमको सूची (ककस्को नाम) ================= */
+function showBalanceList(kind){
+  const want = kind === "customer" ? "customer" : "supplier";
+  const rows = (db.contacts || [])
+    .filter(c => String(c.type || "").trim().toLowerCase() === want)
+    .map(c => ({ name: c.name, phone: c.phone || "", b: contactBalance(c.id).balance || 0 }))
+    .filter(x => x.b > 0)
+    .sort((a, b) => b.b - a.b);
+  const total = rows.reduce((a, x) => a + x.b, 0);
+  const title = kind === "customer" ? "पाउनु पर्ने (ग्राहक)" : "दिनुपर्ने (Supplier)";
+  const trs = rows.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td>${esc(x.phone)}</td><td style="text-align:right">रु. ${x.b.toFixed(2)}</td></tr>`).join("")
+    || '<tr><td colspan="4" style="text-align:center">कुनै बाँकी छैन</td></tr>';
+  const old = document.getElementById("balList"); if (old) old.remove();
+  const wrap = document.createElement("div");
+  wrap.id = "balList";
+  wrap.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:999;padding:12px";
+  wrap.innerHTML = `<div style="background:#fff;border-radius:12px;padding:16px;width:100%;max-width:520px;max-height:85vh;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.25)">
+    <h3 style="margin:0 0 10px">${title}</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr style="background:#f2f2f2"><th style="padding:6px;text-align:left">#</th><th style="padding:6px;text-align:left">नाम</th><th style="padding:6px;text-align:left">फोन</th><th style="padding:6px;text-align:right">रकम</th></tr>
+      ${trs}
+    </table>
+    <div style="margin-top:10px;font-weight:700;text-align:right">जम्मा: रु. ${total.toFixed(2)}</div>
+    <button onclick="document.getElementById('balList').remove()" style="margin-top:12px;padding:8px 14px">बन्द गर्नुहोस्</button>
+  </div>`;
+  wrap.addEventListener("click", e => { if (e.target === wrap) wrap.remove(); });
+  document.body.appendChild(wrap);
+}
+
+
 const KEY="JISHAN_TRADERS_CLOUD_MASTER_V4_20260826"; const PROTECTED_DELETED_IDS=new Set(["1787283212223.459"]);
 const EMPTY_DB={"items":[],"purchases":[],"sales":[],"contacts":[],"payments":[],"expenses":[],"nextP":1,"nextS":1};
 const EMBEDDED_SAFE_DB={"items":[{"id":1787213035438,"name":"प्लास्टिक जार ५० केजी","unit":"पिस","buy":330,"sell":400,"qty":3,"photo":""},{"id":1787213343171,"name":"प्लास्टिक जार ४० केजी","unit":"पिस","buy":230,"sell":280,"qty":10,"photo":""},{"id":1787213392986,"name":"प्लास्टिक जार २५ केजी","unit":"पिस","buy":150,"sell":185,"qty":8,"photo":""},{"id":1787213436058,"name":"प्लास्टिक जार १५ केजी","unit":"पिस","buy":115,"sell":140,"qty":0,"photo":""},{"id":1787213518753,"name":"८ नम्बर गमला","unit":"पिस","buy":32,"sell":42,"qty":0},{"id":1787213604865,"name":"ढाकी गमला ५ केजी","unit":"पिस","buy":65,"sell":80,"qty":0,"photo":""},{"id":1787213676216,"name":"डब्बा ५ केजी","unit":"पिस","buy":70,"sell":80,"qty":0,"photo":""},{"id":1787213720288,"name":"ड्रमको बिर्को","unit":"पिस","buy":20,"sell":35,"qty":-7,"photo":""},{"id":1787396257687,"name":"ग्यालेन ३५ लिटर","unit":"पिस","buy":500,"sell":700,"qty":0},{"id":1787396368358,"name":"ग्यालेन २० लिटर","unit":"दर्जन","buy":1800,"sell":2400,"qty":0},{"id":1787396435373,"name":"ग्यालेन १० लिटर","unit":"दर्जन","buy":950,"sell":1200,"qty":0},{"id":1787396474173,"name":"ग्यालेन ५ लिटर","unit":"दर्जन","buy":540,"sell":800,"qty":1},{"id":1787396608556,"name":"घैला आकार गमला सानो","unit":"पिस","buy":45,"sell":60,"qty":0},{"id":1787396669035,"name":"ढाकी गमला १० केजी","unit":"पिस","buy":130,"sell":150,"qty":0},{"id":1787494031719.2048,"name":"प्लास्टिक जार ६० केजी","unit":"पिस","buy":350,"sell":420,"qty":0},{"id":1787551616461.0203,"name":"पिताम्बरी- तामा पितल सफा गर्ने","unit":"पिस","buy":35,"sell":50,"qty":0}],"purchases":[{"no":"PUR-0003","date":"२०८३-०५-०२","supplier":"किसान प्लास्टिक उधोग","vatRate":0,"discount":0,"subtotal":38190,"vat":0,"total":38190,"rows":[{"id":1787213035438,"qty":18,"rate":330},{"id":1787213343171,"qty":20,"rate":230},{"id":1787213392986,"qty":59,"rate":150},{"id":1787213436058,"qty":30,"rate":115},{"id":1787213518753,"qty":150,"rate":32},{"id":1787213604865,"qty":50,"rate":65},{"id":1787213676216,"qty":90,"rate":70},{"id":1787213720288,"qty":50,"rate":20}],"supplierId":1787221166724},{"no":"PUR-5","date":"2083-05-07","supplier":"किसान प्लास्टिक उधोग","vatRate":0,"discount":0,"subtotal":28770,"vat":0,"total":28770,"rows":[{"id":1787494031719.2048,"qty":15,"rate":350},{"id":1787213436058,"qty":50,"rate":115},{"id":1787213392986,"qty":58,"rate":150},{"id":1787213343171,"qty":20,"rate":230},{"id":1787396435373,"qty":3,"rate":950},{"id":1787396474173,"qty":3,"rate":540}],"supplierId":1787221166724}],"sales":[{"no":"INV-0002","date":"२०८३-०५-०३","customerId":1787216851758,"customer":"गुरुङ्ग फर्निशिङ्ग","vatRate":0,"subtotal":6520,"discount":0,"vat":0,"total":6520,"rows":[{"id":1787213392986,"qty":10,"rate":185},{"id":1787213676216,"qty":10,"rate":80},{"id":1787213518753,"qty":35,"rate":42},{"id":1787213604865,"qty":30,"rate":80}]},{"no":"INV-0003","date":"२०८३-०५-०३","customerId":1787217331530,"customer":"एनिश भाँडा पसल","vatRate":0,"subtotal":5900,"discount":0,"vat":0,"total":5900,"rows":[{"id":1787213343171,"qty":6,"rate":280},{"id":1787213392986,"qty":12,"rate":185},{"id":1787213676216,"qty":25,"rate":80}]},{"no":"INV-0004","date":"२०८३-०५-०३","customerId":1787214859774,"customer":"एम . बि . भाँडा पसल","vatRate":0,"subtotal":10620,"discount":0,"vat":0,"total":10620,"rows":[{"id":1787213035438,"qty":6,"rate":400},{"id":1787213343171,"qty":6,"rate":280},{"id":1787213392986,"qty":16,"rate":185},{"id":1787213436058,"qty":17,"rate":140},{"id":1787213676216,"qty":15,"rate":80}]},{"no":"INV-0005","date":"२०८३-०५-०३","customerId":1787214665088,"customer":"अम्बिका भाँडा पसल","vatRate":0,"subtotal":875,"discount":0,"vat":0,"total":875,"rows":[{"id":1787213720288,"qty":25,"rate":35}]},{"no":"INV-0006","date":"२०८३-०५-०३","customerId":1787214692928,"customer":"काफ्ले भाँडा पसल","vatRate":0,"subtotal":5185,"discount":0,"vat":0,"total":5185,"rows":[{"id":1787213343171,"qty":6,"rate":280},{"id":1787213392986,"qty":5,"rate":185},{"id":1787213436058,"qty":3,"rate":140},{"id":1787213676216,"qty":7,"rate":80},{"id":1787213035438,"qty":4,"rate":400}]},{"no":"INV-0007","date":"२०८३-०५-०३","customerId":1787214544649,"customer":"बुनु भाँडा पसल","vatRate":0,"subtotal":1910,"discount":0,"vat":0,"total":1910,"rows":[{"id":1787213392986,"qty":6,"rate":185},{"id":1787213436058,"qty":4,"rate":140},{"id":1787213676216,"qty":3,"rate":80}]},{"no":"INV-0012","date":"२०८३-०५-०३","customerId":1787214769159,"customer":"पन्चकन्या हार्डवेयर","vatRate":0,"subtotal":2565,"discount":0,"vat":0,"total":2565,"rows":[{"id":1787213035438,"qty":3,"rate":400},{"id":1787213518753,"qty":30,"rate":42},{"id":1787213720288,"qty":3,"rate":35}]},{"no":"INV-13","date":"2083-05-03","customerId":1787396977969.7273,"customer":"माया देवि श्रेष्ठ","vatRate":0,"subtotal":1760,"discount":0,"vat":0,"total":1760,"rows":[{"id":1787213518753,"qty":55,"rate":32}]},{"no":"INV-0001","date":"२०८३-०५-०३","customerId":1787214320051,"customer":"सन्तोश किराना पसल","vatRate":0,"subtotal":11385,"discount":0,"vat":0,"total":11385,"rows":[{"id":1787213035438,"qty":5,"rate":400},{"id":1787213392986,"qty":10,"rate":185},{"id":1787213436058,"qty":6,"rate":140},{"id":1787213676216,"qty":30,"rate":80},{"id":1787213343171,"qty":2,"rate":280},{"id":1787213720288,"qty":25,"rate":35},{"id":1787213518753,"qty":30,"rate":42},{"id":1787213604865,"qty":20,"rate":80}]},{"no":"INV-16","date":"2083-05-07","customerId":1787402995144,"customer":"समिक्षा भाँडा पसल","vatRate":0,"subtotal":19200,"discount":0,"vat":0,"total":19200,"rows":[{"id":1787494031719.2048,"qty":15,"rate":420},{"id":1787213343171,"qty":10,"rate":275},{"id":1787213392986,"qty":20,"rate":180},{"id":1787213436058,"qty":30,"rate":140},{"id":1787396435373,"qty":1,"rate":1200},{"id":1787396474173,"qty":1,"rate":800},{"id":1787213720288,"qty":10,"rate":35}]},{"no":"INV-17","date":"2083-05-07","customerId":1787403150864,"customer":"पुष्पान्जली भाँडा पसल","vatRate":0,"subtotal":1200,"discount":0,"vat":0,"total":1200,"rows":[{"id":1787396435373,"qty":1,"rate":1200}]},{"no":"INV-18","date":"2083-05-07","customerId":1787494917040.9873,"customer":"ओझा भाँडा पस","vatRate":0,"subtotal":10350,"discount":0,"vat":0,"total":10350,"rows":[{"id":1787213392986,"qty":30,"rate":185},{"id":1787213436058,"qty":20,"rate":140},{"id":1787396435373,"qty":1,"rate":1200},{"id":1787396474173,"qty":1,"rate":800}]}],"contacts":[{"id":1787214320051,"type":"customer","name":"सन्तोश किराना पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"९८१७३८१९९१","pan":"","opening":0},{"id":1787214544649,"type":"customer","name":"बुनु भाँडा पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787214665088,"type":"customer","name":"अम्बिका भाँडा पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787214692928,"type":"customer","name":"काफ्ले भाँडा पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787214723696,"type":"customer","name":"खुश्मा भाँडा पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787214769159,"type":"customer","name":"पन्चकन्या हार्डवेयर","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787214859774,"type":"customer","name":"एम . बि . भाँडा पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"९८४२०३०११२","pan":"","opening":0},{"id":1787216851758,"type":"customer","name":"गुरुङ्ग फर्निशिङ्ग","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"९८०७३७६०३५","pan":"","opening":6095},{"id":1787217331530,"type":"customer","name":"एनिश भाँडा पसल","address":"मधुमल्ला, मोरङ्ग - नेपाल","phone":"९८४२१०००३६","pan":"","opening":2000},{"id":1787221166724,"type":"supplier","name":"किसान प्लास्टिक उधोग","address":"बिराटनगर","phone":"","pan":"३०३३२८३४८","opening":0},{"id":1787250508440,"type":"customer","name":"पाण्डे भाँडा पसल","address":"दुर्गापुरी, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787250614903,"type":"customer","name":"कन्काई ट्रेडर्स","address":"सोमबारे,रतुवामाई , मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787284760514,"type":"customer","name":"अनिल श्रेष्ठ","address":"रतुवामाई -१०, मोरङ्ग , सोमबारे - नेपाल","phone":"","pan":"","opening":0},{"id":1787315643746,"type":"customer","name":"नैना मधु","address":"रतुवामाई, लक्ष्मीचोक, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787325811649,"type":"customer","name":"पौडेल भाँँडा पसल","address":"सोमबारे, मोरङ्ग, रतुवामाई - नेपाल","phone":"","pan":"","opening":0},{"id":1787383427167.4133,"type":"supplier","name":"बिक्रम शाह भाँडा पसल","address":"दमक,सुर्तीलाइन,झापा - नेपाल","phone":"","pan":"","opening":0},{"id":1787383487070.541,"type":"supplier","name":"आरधना स्टोर्स","address":"दमक, झापा","phone":"","pan":"","opening":0},{"id":1787391372954,"type":"supplier","name":"गिता प्लास्टिक","address":"दमक, झापा, पशुहाट","phone":"","pan":"","opening":0},{"id":1787395690059,"type":"supplier","name":"कल्पना श्रेष्ठ","address":"दमक,झापा","phone":"९८४२६३१११६","pan":"","opening":60000},{"id":1787396977969.7273,"type":"customer","name":"माया देवि श्रेष्ठ","address":"उर्लाबारि-७","phone":"९८०४०९५४७५","pan":"३०३७०८६५६","opening":0},{"id":1787402995144,"type":"customer","name":"समिक्षा भाँडा पसल","address":"आम्बाडी -३ नम्बर,मोरङ्ग - नेपाल","phone":"९७०४७९४४३५","pan":"","opening":0},{"id":1787403150864,"type":"customer","name":"पुष्पान्जली भाँडा पसल","address":"आम्बाडी - ३,मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787403258134,"type":"supplier","name":"सन्दिप अग्रवाल - बागमती प्लास्टिक","address":"दमक, झापा - नेपाल","phone":"","pan":"","opening":0},{"id":1787494917040.9873,"type":"customer","name":"ओझा भाँडा पस","address":"डाम्राभिट्ट, मोरङ्ग - नेपाल","phone":"","pan":"","opening":0},{"id":1787495801505.7444,"type":"customer","name":"कमला कटुवाल","address":"उर्लाबारी -७","phone":"","pan":"","opening":250}],"payments":[{"id":1787226733367.7505,"type":"receive","contactId":1787214320051,"contact":"सन्तोश किराना पसल","date":"२०८३-०५-०३","amount":5000,"ref":"","note":""},{"id":1787226782638.4753,"type":"receive","contactId":1787214665088,"contact":"अम्बिका भाँडा पसल","date":"२०८३-०५-०३","amount":875,"ref":"","note":""},{"id":1787226815478.8203,"type":"receive","contactId":1787214692928,"contact":"काफ्ले भाँडा पसल","date":"२०८३-०५-०३","amount":5185,"ref":"","note":""},{"id":1787226846318.3057,"type":"receive","contactId":1787214859774,"contact":"एम . बि . भाँडा पसल","date":"२०८३-०५-०३","amount":10620,"ref":"","note":""},{"id":1787226964957.8433,"type":"receive","contactId":1787216851758,"contact":"गुरुङ्ग फर्निशिङ्ग","date":"२०८३-०५-०३","amount":4000,"ref":"","note":""},{"id":1787228299972.3997,"type":"receive","contactId":1787214544649,"contact":"बुनु भाँडा पसल","date":"२०८३-०५-०३","amount":1910,"ref":"","note":""},{"id":1787229092238.184,"type":"receive","contactId":1787214769159,"contact":"पन्चकन्या हार्डवेयर","date":"२०८३-०५-०३","amount":2565,"ref":"","note":""},{"id":1787494615218.6587,"type":"receive","contactId":1787402995144,"contact":"समिक्षा भाँडा पसल","date":"2083-05-07","amount":18850,"ref":"","note":""},{"id":1787495139566.2815,"type":"receive","contactId":1787396977969.7273,"contact":"माया देवि श्रेष्ठ","date":"2083-05-07","amount":1760,"ref":"","note":""},{"id":1787619731057.9927,"type":"receive","contactId":1787403150864,"contact":"पुष्पान्जली भाँडा पसल","date":"2083-05-08","amount":1200,"ref":"","note":""}],"nextP":6,"nextS":19,"deletedItems":["1787283212223.459","1787383663453.8157","1787385354746.7468"]};
@@ -1205,7 +1252,7 @@ function previewBillLogoUpload(file){
 function saveBillLogo(){const status=document.getElementById("billLogoStatus");if(!pendingBillLogo){if(status)status.textContent="पहिले लोगोको फोटो छान्नुहोस्।";return;}try{localStorage.setItem(BILL_LOGO_KEY,pendingBillLogo);pendingBillLogo="";if(status)status.textContent="लोगो सुरक्षित भयो। अब बिक्री/खरिद बिलको Preview र Print मा देखिन्छ।";initBillLogoSettings();}catch(e){if(status)status.textContent="लोगो सुरक्षित भएन। सानो फोटो छानेर फेरि प्रयास गर्नुहोस्।";}}
 function clearBillLogo(){if(!confirm("बिलको लोगो हटाउने हो?"))return;try{localStorage.removeItem(BILL_LOGO_KEY);}catch(e){}pendingBillLogo="";const f=document.getElementById("billLogoFile");if(f)f.value="";const status=document.getElementById("billLogoStatus");if(status)status.textContent="लोगो हटाइयो।";initBillLogoSettings();}
 function initBillLogoSettings(){const photo=getBillLogo(),preview=document.getElementById("billLogoPreview"),wrap=document.getElementById("billLogoPreviewWrap");if(preview&&photo)preview.src=photo;if(wrap)wrap.style.display=photo?"block":"none";if(photo){const st=document.getElementById("billLogoStatus");if(st&&!st.textContent)st.textContent="हालको लोगो सुरक्षित छ।";}}
-function billHeaderHTML(title){const logo=getBillLogo();return `<div style="position:relative;text-align:center;min-height:104px;padding:0 0 4px 0;break-inside:avoid"><div style="position:absolute;left:0;top:0;width:100px;height:82px;display:flex;align-items:flex-start;justify-content:flex-start">${logo?`<img src="${logo}" alt="Jishan Traders Logo" style="max-width:96px;max-height:78px;object-fit:contain;display:block">`:""}</div><h1 style="margin:0">जिशन ट्रेडर्स</h1><div>उर्लाबारी–७, बरगाछी, मोरङ</div><div>फोन: ९८४२०७५८३८ | PAN: ६१२९९३७३०</div><h2 style="margin:8px 0 0">${title}</h2></div>`;}
+function billHeaderHTML(title){const logo=getBillLogo();return `<div style="position:relative;text-align:center;min-height:104px;padding:0 0 4px 0;break-inside:avoid"><div style="position:absolute;left:0;top:0;width:100px;height:82px;display:flex;align-items:flex-start;justify-content:flex-start">${logo?`<img src="${logo}" alt="Jishan Traders Logo" style="max-width:96px;max-height:78px;object-fit:contain;display:block">`:""}</div><h1 style="margin:0">${shopName()}</h1><div>उर्लाबारी–७, बरगाछी, मोरङ</div><div>फोन: ९८४२०७५८३८ | PAN: ६१२९९३७३०</div><h2 style="margin:8px 0 0">${title}</h2></div>`;}
 const SIGNATURE_PHOTO_KEY = "JISHAN_TRADERS_BILL_MAKER_SIGNATURE_V1";
 let pendingSignaturePhoto = "";
 function getSignaturePhoto(){try{const v=localStorage.getItem(SIGNATURE_PHOTO_KEY)||"";return /^data:image\/(png|jpeg|webp);base64,/i.test(v)?v:"";}catch(e){return "";}}
@@ -1402,7 +1449,7 @@ function renderReports(){
 function previewReport(){
  renderReports();
  let content=$("reportCards").outerHTML+$("reportTable").outerHTML;
- showPreview(`<div style="text-align:center"><h1>जिशन ट्रेडर्स</h1><div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>रिपोर्ट / REPORT</h2></div>`+content);
+ showPreview(`<div style="text-align:center"><h1>${shopName()}</h1><div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>रिपोर्ट / REPORT</h2></div>`+content);
 }
 
 function addContact(){
@@ -1564,10 +1611,10 @@ function previewContactBills(id){
    return rname!==undefined&&rname!==null&&norm(rname)===target;
  };
  let bills=c.type==="customer"?db.sales.filter(x=>match(x.customerId,x.customer)):db.purchases.filter(x=>match(x.supplierId,x.supplierName||x.supplier));
- if(!bills.length){showPreview(`<div style="text-align:center"><h1>जिशन ट्रेडर्स</h1><h2>${c.type==="customer"?"Customer":"Supplier"} Bill Preview</h2><p><b>${esc(c.name)}</b></p><p>यस Customer/Supplier को कुनै Bill भेटिएन।</p></div>`);return;}
+ if(!bills.length){showPreview(`<div style="text-align:center"><h1>${shopName()}</h1><h2>${c.type==="customer"?"Customer":"Supplier"} Bill Preview</h2><p><b>${esc(c.name)}</b></p><p>यस Customer/Supplier को कुनै Bill भेटिएन।</p></div>`);return;}
  let title=c.type==="customer"?"Customer Bill Preview":"Supplier Bill Preview";
  let body=bills.map(x=>`<div style="page-break-after:always">${c.type==="customer"?salesHTML(x):purchaseHTML(x)}</div>`).join("");
- showPreview(`<div style="text-align:center"><h1>जिशन ट्रेडर्स</h1><div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>${title}</h2><div><b>${esc(c.name)}</b></div></div>`+body);
+ showPreview(`<div style="text-align:center"><h1>${shopName()}</h1><div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>${title}</h2><div><b>${esc(c.name)}</b></div></div>`+body);
 }
 
 function clearContactSearch(){
@@ -2906,3 +2953,5 @@ function selectCashParty(){
 <script>
 if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
 </script>
+
+<script>applyShopName();</script>
