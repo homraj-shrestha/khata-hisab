@@ -579,7 +579,7 @@ img{max-width:100%;height:auto}
 <script>
 /* ================= व्यवसायको नाम ================= */
 const SHOP_KEY = "JISHAN_SHOP_NAME_V1";
-function shopName(){ return localStorage.getItem(SHOP_KEY) || "जिशन ट्रेडर्स"; }
+function shopName(){ if (db && db.shopName) return db.shopName; return localStorage.getItem(SHOP_KEY) || "जिशन ट्रेडर्स"; }
 function applyShopName(){
   const n = shopName();
   document.documentElement.style.setProperty("--shop", JSON.stringify(n));
@@ -590,7 +590,8 @@ function applyShopName(){
 function saveShopName(){
   const v = (document.getElementById("shopNameIn").value || "").trim();
   if (!v) return alert("नाम लेख्नुहोस्।");
-  localStorage.setItem(SHOP_KEY, v); applyShopName(); alert("नाम सेभ भयो।");
+  db.shopName = v; db.shopNameTs = Date.now(); localStorage.setItem(SHOP_KEY, v);
+  saveDB(true); applyShopName(); alert("नाम सेभ भयो।");
 }
 
 /* ================= पाउनु / दिनुपर्ने रकमको सूची (ककस्को नाम) ================= */
@@ -979,6 +980,10 @@ function mergeCloudDB(incoming){
     incoming.nextS || 1
   );
 
+  if (incoming.shopName && (incoming.shopNameTs || 0) > (db.shopNameTs || 0)) {
+    db.shopName = incoming.shopName; db.shopNameTs = incoming.shopNameTs;
+    localStorage.setItem(SHOP_KEY, incoming.shopName);
+  }
   migrateContactLinks();
 }
 async function cloudRequest(action,payload){const c=getCloudCfg();if(!c.url||!c.key)throw new Error("पहिले Cloud Settings मा URL र Sync Key राख्नुहोस्।");const body={action,key:c.key,payload:payload||{}};const res=await fetch(c.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});const text=await res.text();let data;try{data=JSON.parse(text)}catch(e){throw new Error("Cloud response बुझ्न सकिएन। Web App URL सही छ कि जाँच्नुहोस्।")}if(!data.ok)throw new Error(data.error||"Cloud error");return data}
