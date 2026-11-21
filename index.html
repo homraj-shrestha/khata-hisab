@@ -447,7 +447,11 @@ img{max-width:100%;height:auto}
 </div>
 </section>
 <section id="backup" class="page">
-<div class="card"><h2>🏷️ व्यवसायको नाम</h2><p>यो नाम माथिको शीर्षक, बिल र छपाइमा देखिन्छ।</p><input id="shopNameIn" placeholder="व्यवसायको नाम" style="width:70%"> <button onclick="saveShopName()">💾 सेभ</button></div>
+<div class="card"><h2>🏷️ व्यवसायको नाम</h2><p>यो नाम माथिको शीर्षक, बिल र छपाइमा देखिन्छ।</p><label>व्यवसायको नाम</label><input id="shopNameIn" placeholder="व्यवसायको नाम">
+<label>ठेगाना</label><input id="shopAddrIn" placeholder="जस्तै: बजार, वडा नं. ७, झापा">
+<label>कन्ट्याक्ट नम्बर</label><input id="shopContactIn" placeholder="जस्तै: 9800000000">
+<label>पान नम्बर (PAN)</label><input id="shopPanIn" placeholder="जस्तै: 123456789">
+<button onclick="saveShopName()">💾 सेभ गर्नुहोस्</button></div>
 <div class="card"><h2>💾 Backup / Restore</h2>
 <p><b>Offline-first:</b> तपाईंको data यही browser मा पनि सुरक्षित रहन्छ। तर computer/browser/Gmail profile परिवर्तन गर्दा data नहराओस् भनेर नियमित Backup राख्नुहोस्।</p>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
@@ -580,18 +584,32 @@ img{max-width:100%;height:auto}
 /* ================= व्यवसायको नाम ================= */
 const SHOP_KEY = "JISHAN_SHOP_NAME_V1";
 function shopName(){ if (db && db.shopName) return db.shopName; return localStorage.getItem(SHOP_KEY) || "जिशन ट्रेडर्स"; }
+function shopInfoLine(){
+  const parts = [];
+  if (db && db.shopAddr) parts.push("ठेगाना: " + db.shopAddr);
+  if (db && db.shopContact) parts.push("फोन: " + db.shopContact);
+  if (db && db.shopPan) parts.push("PAN: " + db.shopPan);
+  return parts.length ? '<div style="font-size:12px;margin-top:2px">' + parts.join(" · ") + '</div>' : "";
+}
 function applyShopName(){
   const n = shopName();
   document.documentElement.style.setProperty("--shop", JSON.stringify(n));
   const t = document.getElementById("shopTitle"); if (t) t.textContent = n;
   document.title = n + " - Accounting";
   const inp = document.getElementById("shopNameIn"); if (inp && !inp.value) inp.value = n;
+  const a = document.getElementById("shopAddrIn"); if (a && !a.value) a.value = (db && db.shopAddr) || "";
+  const c = document.getElementById("shopContactIn"); if (c && !c.value) c.value = (db && db.shopContact) || "";
+  const pn = document.getElementById("shopPanIn"); if (pn && !pn.value) pn.value = (db && db.shopPan) || "";
 }
 function saveShopName(){
   const v = (document.getElementById("shopNameIn").value || "").trim();
   if (!v) return alert("नाम लेख्नुहोस्।");
-  db.shopName = v; db.shopNameTs = Date.now(); localStorage.setItem(SHOP_KEY, v);
-  saveDB(true); applyShopName(); alert("नाम सेभ भयो।");
+  db.shopName = v;
+  db.shopAddr = (document.getElementById("shopAddrIn").value || "").trim();
+  db.shopContact = (document.getElementById("shopContactIn").value || "").trim();
+  db.shopPan = (document.getElementById("shopPanIn").value || "").trim();
+  db.shopNameTs = Date.now(); localStorage.setItem(SHOP_KEY, v);
+  saveDB(true); applyShopName(); alert("विवरण सेभ भयो।");
 }
 
 /* ================= पाउनु / दिनुपर्ने रकमको सूची (ककस्को नाम) ================= */
@@ -982,6 +1000,7 @@ function mergeCloudDB(incoming){
 
   if (incoming.shopName && (incoming.shopNameTs || 0) > (db.shopNameTs || 0)) {
     db.shopName = incoming.shopName; db.shopNameTs = incoming.shopNameTs;
+    db.shopAddr = incoming.shopAddr || ""; db.shopContact = incoming.shopContact || ""; db.shopPan = incoming.shopPan || "";
     localStorage.setItem(SHOP_KEY, incoming.shopName);
   }
   migrateContactLinks();
@@ -1257,7 +1276,7 @@ function previewBillLogoUpload(file){
 function saveBillLogo(){const status=document.getElementById("billLogoStatus");if(!pendingBillLogo){if(status)status.textContent="पहिले लोगोको फोटो छान्नुहोस्।";return;}try{localStorage.setItem(BILL_LOGO_KEY,pendingBillLogo);pendingBillLogo="";if(status)status.textContent="लोगो सुरक्षित भयो। अब बिक्री/खरिद बिलको Preview र Print मा देखिन्छ।";initBillLogoSettings();}catch(e){if(status)status.textContent="लोगो सुरक्षित भएन। सानो फोटो छानेर फेरि प्रयास गर्नुहोस्।";}}
 function clearBillLogo(){if(!confirm("बिलको लोगो हटाउने हो?"))return;try{localStorage.removeItem(BILL_LOGO_KEY);}catch(e){}pendingBillLogo="";const f=document.getElementById("billLogoFile");if(f)f.value="";const status=document.getElementById("billLogoStatus");if(status)status.textContent="लोगो हटाइयो।";initBillLogoSettings();}
 function initBillLogoSettings(){const photo=getBillLogo(),preview=document.getElementById("billLogoPreview"),wrap=document.getElementById("billLogoPreviewWrap");if(preview&&photo)preview.src=photo;if(wrap)wrap.style.display=photo?"block":"none";if(photo){const st=document.getElementById("billLogoStatus");if(st&&!st.textContent)st.textContent="हालको लोगो सुरक्षित छ।";}}
-function billHeaderHTML(title){const logo=getBillLogo();return `<div style="position:relative;text-align:center;min-height:104px;padding:0 0 4px 0;break-inside:avoid"><div style="position:absolute;left:0;top:0;width:100px;height:82px;display:flex;align-items:flex-start;justify-content:flex-start">${logo?`<img src="${logo}" alt="Jishan Traders Logo" style="max-width:96px;max-height:78px;object-fit:contain;display:block">`:""}</div><h1 style="margin:0">${shopName()}</h1><div>उर्लाबारी–७, बरगाछी, मोरङ</div><div>फोन: ९८४२०७५८३८ | PAN: ६१२९९३७३०</div><h2 style="margin:8px 0 0">${title}</h2></div>`;}
+function billHeaderHTML(title){const logo=getBillLogo();return `<div style="position:relative;text-align:center;min-height:104px;padding:0 0 4px 0;break-inside:avoid"><div style="position:absolute;left:0;top:0;width:100px;height:82px;display:flex;align-items:flex-start;justify-content:flex-start">${logo?`<img src="${logo}" alt="Jishan Traders Logo" style="max-width:96px;max-height:78px;object-fit:contain;display:block">`:""}</div><h1 style="margin:0">${shopName()}</h1>${shopInfoLine()}<div>उर्लाबारी–७, बरगाछी, मोरङ</div><div>फोन: ९८४२०७५८३८ | PAN: ६१२९९३७३०</div><h2 style="margin:8px 0 0">${title}</h2></div>`;}
 const SIGNATURE_PHOTO_KEY = "JISHAN_TRADERS_BILL_MAKER_SIGNATURE_V1";
 let pendingSignaturePhoto = "";
 function getSignaturePhoto(){try{const v=localStorage.getItem(SIGNATURE_PHOTO_KEY)||"";return /^data:image\/(png|jpeg|webp);base64,/i.test(v)?v:"";}catch(e){return "";}}
@@ -1454,7 +1473,7 @@ function renderReports(){
 function previewReport(){
  renderReports();
  let content=$("reportCards").outerHTML+$("reportTable").outerHTML;
- showPreview(`<div style="text-align:center"><h1>${shopName()}</h1><div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>रिपोर्ट / REPORT</h2></div>`+content);
+ showPreview(`<div style="text-align:center"><h1>${shopName()}</h1>${shopInfoLine()}<div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>रिपोर्ट / REPORT</h2></div>`+content);
 }
 
 function addContact(){
@@ -1616,10 +1635,10 @@ function previewContactBills(id){
    return rname!==undefined&&rname!==null&&norm(rname)===target;
  };
  let bills=c.type==="customer"?db.sales.filter(x=>match(x.customerId,x.customer)):db.purchases.filter(x=>match(x.supplierId,x.supplierName||x.supplier));
- if(!bills.length){showPreview(`<div style="text-align:center"><h1>${shopName()}</h1><h2>${c.type==="customer"?"Customer":"Supplier"} Bill Preview</h2><p><b>${esc(c.name)}</b></p><p>यस Customer/Supplier को कुनै Bill भेटिएन।</p></div>`);return;}
+ if(!bills.length){showPreview(`<div style="text-align:center"><h1>${shopName()}</h1>${shopInfoLine()}<h2>${c.type==="customer"?"Customer":"Supplier"} Bill Preview</h2><p><b>${esc(c.name)}</b></p><p>यस Customer/Supplier को कुनै Bill भेटिएन।</p></div>`);return;}
  let title=c.type==="customer"?"Customer Bill Preview":"Supplier Bill Preview";
  let body=bills.map(x=>`<div style="page-break-after:always">${c.type==="customer"?salesHTML(x):purchaseHTML(x)}</div>`).join("");
- showPreview(`<div style="text-align:center"><h1>${shopName()}</h1><div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>${title}</h2><div><b>${esc(c.name)}</b></div></div>`+body);
+ showPreview(`<div style="text-align:center"><h1>${shopName()}</h1>${shopInfoLine()}<div>उर्लाबारी–७, बरगाछी, मोरङ | PAN: ६१२९९३७३०</div><h2>${title}</h2><div><b>${esc(c.name)}</b></div></div>`+body);
 }
 
 function clearContactSearch(){
